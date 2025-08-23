@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
+import '../api/menuItem.api.dart';
+import '../models/menuItem.model.dart';
+import '../response/api_response.dart';
+import '../models/user.model.dart'; // For SavedLocation
 
 class StoreFrontPage extends StatefulWidget {
-  const StoreFrontPage({super.key});
+  final SavedLocation? selectedLocation;
+  const StoreFrontPage({super.key, this.selectedLocation});
 
   @override
   State<StoreFrontPage> createState() => _StoreFrontPageState();
@@ -11,60 +16,48 @@ class StoreFrontPage extends StatefulWidget {
 class _StoreFrontPageState extends State<StoreFrontPage> {
   final TextEditingController _searchController = TextEditingController();
 
-  // Mock data for products
-  final List<Map<String, dynamic>> _featuredProducts = [
-    {
-      'name': 'Roasted Chicken',
-      'restaurant': 'Migano Cafe - Musanze',
-      'price': 'RWF 10,000',
-      'rating': 3,
-      'distance': '4km',
-      'image': 'chicken.jpg',
-    },
-    {
-      'name': 'Sweet Banana (small)',
-      'restaurant': 'Musanze Food Market',
-      'price': 'RWF 1,100',
-      'rating': 4,
-      'distance': '5km',
-      'image': 'banana.jpg',
-    },
-    {
-      'name': 'Hennessy',
-      'restaurant': 'Rukara Liquors',
-      'price': 'RWF 110,000',
-      'rating': 5,
-      'distance': '3km',
-      'image': 'hennessy.jpg',
-    },
-  ];
+  List<MenuItem> _featuredProducts = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
-  final List<Map<String, dynamic>> _allDayProducts = [
-    {
-      'name': 'Migano Cafe - Musanze',
-      'description': 'DF:RWF1,000',
-      'rating': 3,
-      'distance': '4km',
-      'image': 'migano.jpg',
-    },
-    {
-      'name': 'La Paillotte',
-      'description': 'DF:RWF1,000',
-      'rating': 4,
-      'distance': '5km',
-      'image': 'paillotte.jpg',
-    },
-    {
-      'name': 'Amikus',
-      'description': 'DF:RWF1,000',
-      'rating': 4,
-      'distance': '6km',
-      'image': 'amikus.jpg',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchMenuItems();
+  }
+
+  Future<void> _fetchMenuItems() async {
+    print("Fetching menu items: Location - ${widget.selectedLocation?.name}");
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    // Optionally, you can use location to filter menu items by province/city
+    String? searchLocation = widget.selectedLocation?.name;
+
+    final response = await MenuItemApi.getAllMenuItems(
+      search: _searchController.text.isNotEmpty ? _searchController.text : null,
+      // You can add more filters here based on location if your backend supports it
+    );
+
+    if (response.success && response.data != null) {
+      setState(() {
+        _featuredProducts = response.data!;
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _errorMessage = response.message;
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final locationName = widget.selectedLocation?.name ?? 'Select Location';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -120,9 +113,9 @@ class _StoreFrontPageState extends State<StoreFrontPage> {
                             ),
                             Row(
                               children: [
-                                const Text(
-                                  'Ruhengeri',
-                                  style: TextStyle(
+                                Text(
+                                  locationName,
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.onBackground,
@@ -193,7 +186,15 @@ class _StoreFrontPageState extends State<StoreFrontPage> {
                                 ),
                                 border: InputBorder.none,
                               ),
+                              onSubmitted: (value) => _fetchMenuItems(),
                             ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.refresh,
+                              color: AppColors.primary,
+                            ),
+                            onPressed: _fetchMenuItems,
                           ),
                         ],
                       ),
@@ -239,7 +240,7 @@ class _StoreFrontPageState extends State<StoreFrontPage> {
 
               const SizedBox(height: 24),
 
-              // Categories Grid
+              // Categories Grid (unchanged)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: GridView.count(
@@ -300,113 +301,146 @@ class _StoreFrontPageState extends State<StoreFrontPage> {
 
               const SizedBox(height: 16),
 
-              // Featured Products Horizontal List
-              SizedBox(
-                height: 200,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: _featuredProducts.length,
-                  itemBuilder: (context, index) {
-                    final product = _featuredProducts[index];
-                    return Container(
-                      width: 160,
-                      margin: const EdgeInsets.only(right: 16),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.3),
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(12),
-                              ),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.fastfood,
-                                size: 40,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  product['name'],
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.onBackground,
-                                  ),
+              // Featured Products Horizontal List (from API)
+              if (_isLoading)
+                const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                )
+              else if (_errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 20,
+                  ),
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: AppColors.error),
+                  ),
+                )
+              else if (_featuredProducts.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  child: Text(
+                    'No products found.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                )
+              else
+                SizedBox(
+                  height: 200,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: _featuredProducts.length,
+                    itemBuilder: (context, index) {
+                      final product = _featuredProducts[index];
+                      return Container(
+                        width: 160,
+                        margin: const EdgeInsets.only(right: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              height: 100,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.3),
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(12),
                                 ),
-                                Text(
-                                  product['restaurant'],
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    color: AppColors.textSecondary,
+                                image: product.imageUrl != null
+                                    ? DecorationImage(
+                                        image: NetworkImage(product.imageUrl!),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null,
+                              ),
+                              child:
+                                  product.imageUrl == null
+                                      ? const Center(
+                                        child: Icon(
+                                          Icons.fastfood,
+                                          size: 40,
+                                          color: AppColors.primary,
+                                        ),
+                                      )
+                                      : null,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    product.name!,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.onBackground,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      product['price'],
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.onBackground,
+                                  Text(
+                                    product.vendorId?.name ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'RWF ${product.price}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.onBackground,
+                                        ),
                                       ),
-                                    ),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.star,
-                                          size: 12,
-                                          color: Colors.orange,
-                                        ),
-                                        Text(
-                                          '${product['rating']}',
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            color: AppColors.textSecondary,
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.star,
+                                            size: 12,
+                                            color: Colors.orange,
                                           ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          product['distance'],
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            color: AppColors.textSecondary,
+                                          Text(
+                                            '4', // You can replace with real rating if available
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: AppColors.textSecondary,
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            product.vendorId?.address ?? '',
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
 
               const SizedBox(height: 24),
 
-              // Pay.rw Banner
+              // Pay.rw Banner (unchanged)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
                 height: 100,
@@ -475,7 +509,7 @@ class _StoreFrontPageState extends State<StoreFrontPage> {
 
               const SizedBox(height: 24),
 
-              // Vuba all day ga mwa section
+              // Vuba all day ga mwa section (optional: you can fetch more products here)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
@@ -490,104 +524,8 @@ class _StoreFrontPageState extends State<StoreFrontPage> {
 
               const SizedBox(height: 16),
 
-              // All Day Products Grid
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                  childAspectRatio: 0.75,
-                ),
-                itemCount: _allDayProducts.length,
-                itemBuilder: (context, index) {
-                  final product = _allDayProducts[index];
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.3),
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(12),
-                              ),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.restaurant,
-                                size: 30,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(6),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    product['name'],
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.onBackground,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        product['description'],
-                                        style: const TextStyle(
-                                          fontSize: 7,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 2),
-                                    const Icon(
-                                      Icons.star,
-                                      size: 8,
-                                      color: Colors.orange,
-                                    ),
-                                    Text(
-                                      '${product['rating']}',
-                                      style: const TextStyle(
-                                        fontSize: 7,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-
+              // All Day Products Grid (optional: you can use _featuredProducts or another API call)
+              // ...existing code for grid or you can remove the mock data and use API data
               const SizedBox(height: 100), // Bottom padding for navigation bar
             ],
           ),

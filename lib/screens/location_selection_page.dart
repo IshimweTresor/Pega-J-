@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vuba/screens/store_front_page.dart';
 import '../api/user.api.dart';
 import '../models/user.model.dart';
 import '../response/user_location_responses.dart';
@@ -173,13 +174,10 @@ Future<void> _fetchUserLocations() async {
 
   void _selectLocation(SavedLocation location) {
     // Navigate to home page with selected location
-    Navigator.push(
+   Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => HomePage(
-          selectedLocation: location.name,
-          selectedLocationData: location,
-        ),
+        builder: (context) => StoreFrontPage(selectedLocation: location),
       ),
     );
   }
